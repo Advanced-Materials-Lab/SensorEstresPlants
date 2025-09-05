@@ -1,0 +1,126 @@
+// Código realizado para circuito con tres puentes de Wheatstone, 3 sensores, 1 regulador y 3 amplificadores de voltaje para ESP32
+
+#include <SPI.h>
+#include <SD.h>
+
+// Pines analógicos (entradas de los voltajes amplificados)
+#define PIN_VD1 34  // Canal 1
+#define PIN_VD2 35  // Canal 2
+#define PIN_VD3 32  // Canal 3
+
+// Resistencias fijas de cada canal (cambia según tu circuito)
+const float R2_1 = 20;   // Ω canal 1
+const float R2_2 = 20;   // Ω canal 2
+const float R2_3 = 20;   // Ω canal 3
+
+// Parámetros eléctricos
+const float Vin = 1.199;   // Voltaje de entrada al puente
+const float GAIN = 2.0;    // Ganancia del amplificador
+
+// Configuración SD
+const int SD_CS_PIN = 5;
+unsigned long tiempoInicio = 0;
+File archivo;
+
+// Variables de filtrado
+float VD1_filtrado = 0, VD2_filtrado = 0, VD3_filtrado = 0;
+bool primeraLectura = true;
+
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);  // Lectura de 0 a 4095 (12 bits)
+
+  if (!SD.begin(SD_CS_PIN)) {
+    Serial.println("Error al iniciar la tarjeta SD");
+  } else {
+    Serial.println("Tarjeta SD lista.");
+    archivo = SD.open("/datos.txt", FILE_APPEND);
+    if (archivo) {
+      archivo.println("\n--- NUEVA SESIÓN ---");
+      archivo.println("Tiempo_s,VD1_V,Rx1_Ohmios,VD2_V,Rx2_Ohmios,VD3_V,Rx3_Ohmios");
+      archivo.close();
+    } else {
+      Serial.println("No se pudo abrir datos.txt");
+    }
+  }
+
+  tiempoInicio = millis();
+  Serial.println("Tiempo_s,VD1_V,Rx1_Ohmios,VD2_V,Rx2_Ohmios,VD3_V,Rx3_Ohmios");
+}
+
+float leerPromedio(int pin, int muestras = 10) {
+  long suma = 0;
+  for (int i = 0; i < muestras; i++) {
+    suma += analogRead(pin);
+    delay(5);
+  }
+  return (float)suma / muestras;
+}
+
+float filtrar(float nuevo, float anterior, float alfa = 0.2) {
+  return alfa * nuevo + (1.0 - alfa) * anterior;
+}
+
+void loop() {
+  unsigned long tiempoActual = millis();
+  unsigned long tiempoSegundos = (tiempoActual - tiempoInicio) / 1000;
+
+  // Leer valores crudos de ADC
+  float rawVD1 = leerPromedio(PIN_VD1);
+  float rawVD2 = leerPromedio(PIN_VD2);
+  float rawVD3 = leerPromedio(PIN_VD3);
+
+  // Convertir a voltajes reales (ajustando por ganancia y referencia)
+  float VD1 = (rawVD1 / 4095.0) * 3.7 / GAIN;
+  float VD2 = (rawVD2 / 4095.0) * 3.7 / GAIN;
+  float VD3 = (rawVD3 / 4095.0) * 3.7 / GAIN;
+
+  // Filtro inicial
+  if (primeraLectura) {
+    VD1_filtrado = VD1;
+    VD2_filtrado = VD2;
+    VD3_filtrado = VD3;
+    primeraLectura = false;
+  } else {
+    VD1_filtrado = filtrar(VD1, VD1_filtrado);
+    VD2_filtrado = filtrar(VD2, VD2_filtrado);
+    VD3_filtrado = filtrar(VD3, VD3_filtrado);
+  }
+
+  // Calcular resistencias para cada canal
+  float Rx1 = (VD1_filtrado * R2_1) / (Vin - VD1_filtrado);
+  float Rx2 = (VD2_filtrado * R2_2) / (Vin - VD2_filtrado);
+  float Rx3 = (VD3_filtrado * R2_3) / (Vin - VD3_filtrado);
+
+  // Validaciones (si el valor no tiene sentido, lo marcamos como -1)
+  if (Rx1 < 0 || VD1_filtrado >= Vin || Rx1 > 1000) Rx1 = -1;
+  if (Rx2 < 0 || VD2_filtrado >= Vin || Rx2 > 1000) Rx2 = -1;
+  if (Rx3 < 0 || VD3_filtrado >= Vin || Rx3 > 1000) Rx3 = -1;
+
+  // Mostrar en Serial
+  Serial.print(tiempoSegundos); Serial.print(",");
+  Serial.print(VD1_filtrado, 3); Serial.print(",");
+  Serial.print(Rx1, 2); Serial.print(",");
+  Serial.print(VD2_filtrado, 3); Serial.print(",");
+  Serial.print(Rx2, 2); Serial.print(",");
+  Serial.print(VD3_filtrado, 3); Serial.print(",");
+  Serial.println(Rx3, 2);
+
+  // Guardar en SD
+  archivo = SD.open("/datos.txt", FILE_APPEND);
+  if (archivo) {
+    archivo.print(tiempoSegundos); archivo.print(",");
+    archivo.print(VD1_filtrado, 3); archivo.print(",");
+    archivo.print(Rx1, 2); archivo.print(",");
+    archivo.print(VD2_filtrado, 3); archivo.print(",");
+    archivo.print(Rx2, 2); archivo.print(",");
+    archivo.print(VD3_filtrado, 3); archivo.print(",");
+    archivo.println(Rx3, 2);
+    archivo.close();
+    Serial.println("Dato guardado en SD.");
+  } else {
+    Serial.println("Error escribiendo en datos.txt");
+  }
+
+  delay(1000); // Espera de 1 segundo entre muestras
+}
