@@ -22,7 +22,7 @@ const char* ssid = "CIAM"; // Nombre de la red
 const char* password = "0123456789";// Contraseña de la red 
 
 // --- MQTT ---
-const char* mqtt_server = "broker.hivemq.com"; 
+const char* mqtt_server = "broker.emqx.io"; 
 const int mqtt_port = 1883;
 WiFiClient espClient;
 PubSubClient client(espClient);
