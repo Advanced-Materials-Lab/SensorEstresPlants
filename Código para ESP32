@@ -1,0 +1,99 @@
+// Código realizado para ESP32 para circuito con un puente de Weasthone de 20 ohms, 1 sensor, 1 regulador de volatje y 1 amplicador de voltaje 
+
+#include <SPI.h>
+#include <SD.h>
+
+#define PIN_VD 34  // Nodo D
+
+const float R2 = 20;        // R2 fija en el puente
+const float Vin = 1.2469;      // Voltaje de entrada al puente
+const float GAIN = 2.0;       // Ganancia del amplificador
+
+const int SD_CS_PIN = 5;      // Pin CS de la tarjeta SD
+unsigned long tiempoInicio = 0;
+File archivo;
+
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);  // Lectura de 0 a 4095
+
+  if (!SD.begin(SD_CS_PIN)) {
+    Serial.println("Error al iniciar la tarjeta SD");
+  } else {
+    Serial.println("Tarjeta SD lista.");
+    archivo = SD.open("/datos.txt", FILE_APPEND);
+    if (archivo) {
+      archivo.println("\n--- NUEVA SESIÓN ---");
+      archivo.println("Tiempo_s,VD_V,Rx_Ohmios");
+      archivo.close();
+    } else {
+      Serial.println("No se pudo abrir datos.txt");
+    }
+  }
+
+  tiempoInicio = millis();
+  Serial.println("Tiempo_s,VD_V,Rx_Ohmios");
+}
+
+float leerPromedio(int pin, int muestras = 10) {
+  long suma = 0;
+  for (int i = 0; i < muestras; i++) {
+    suma += analogRead(pin);
+    delay(5);
+  }
+  return (float)suma / muestras;
+}
+
+float filtrar(float nuevo, float anterior, float alfa = 0.2) {
+  return alfa * nuevo + (1.0 - alfa) * anterior;
+}
+
+float VD_filtrado = 0;
+bool primeraLectura = true;
+
+void loop() {
+  unsigned long tiempoActual = millis();
+  unsigned long tiempoSegundos = (tiempoActual - tiempoInicio) / 1000;
+
+  float rawVD = leerPromedio(PIN_VD);
+  float VD = (rawVD / 4095.0) * 3.7 / GAIN;
+
+  if (primeraLectura) {
+    VD_filtrado = VD;
+    primeraLectura = false;
+  } else {
+    VD_filtrado = filtrar(VD, VD_filtrado);
+  }
+
+  float Rx = (VD_filtrado * R2) / (Vin - VD_filtrado);
+  if (Rx < 0 || VD_filtrado >= Vin || Rx > 100) {
+    Rx = -1;
+  }
+
+  // Mostrar en Serial
+  Serial.print(tiempoSegundos); Serial.print(",");
+  Serial.print(VD_filtrado, 2); Serial.print(",");
+  if (Rx < 0) {
+    Serial.println("-1");
+  } else {
+    Serial.println(Rx,2);  // Mostrar Rx como número entero
+  }
+
+  // Guardar en SD
+  archivo = SD.open("/datos.txt", FILE_APPEND);
+  if (archivo) {
+    archivo.print(tiempoSegundos); archivo.print(",");
+    archivo.print(VD_filtrado, 2); archivo.print(",");
+    if (Rx < 0) {
+      archivo.println("-1");
+    } else {
+      archivo.println(Rx,2);  // Guardar como entero
+    }
+    archivo.close();
+    Serial.println("Dato guardado en SD.");
+  } else {
+    Serial.println("Error escribiendo en datos.txt");
+  }
+
+  delay(1000);
+}
