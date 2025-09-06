@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>🌱 Detección y Control del Estrés en las Plantas</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #2e7d32;
+    }
+    h2 {
+      color: #1565c0;
+      border-bottom: 2px solid #ccc;
+      padding-bottom: 5px;
+    }
+    .status {
+      text-align: center;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+    .connected {
+      color: green;
+    }
+    .disconnected {
+      color: red;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0px 2px 6px rgba(0,0,0,0.2);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: center;
+    }
+    canvas {
+      max-width: 100%;
+      height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🌱 Detección y Control del Estrés en las Plantas</h1>
+  
+  <!-- Estado de conexión -->
+  <div class="status">
+    Estado MQTT: <span id="mqttStatus" class="disconnected">Desconectado</span> |
+    Estado ESP32: <span id="espStatus" class="disconnected">Desconocido</span>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Sensor 1</h2>
+      <table id="table1"><tr><th>Tiempo</th><th>Valor</th></tr></table>
+      <canvas id="chart1"></canvas>
+    </div>
+    <div class="card">
+      <h2>Sensor 2</h2>
+      <table id="table2"><tr><th>Tiempo</th><th>Valor</th></tr></table>
+      <canvas id="chart2"></canvas>
+    </div>
+    <div class="card">
+      <h2>Sensor 3</h2>
+      <table id="table3"><tr><th>Tiempo</th><th>Valor</th></tr></table>
+      <canvas id="chart3"></canvas>
+    </div>
+    <div class="card">
+      <h2>Sensor 4</h2>
+      <table id="table4"><tr><th>Tiempo</th><th>Valor</th></tr></table>
+      <canvas id="chart4"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // -------- CONFIGURACIÓN MQTT --------
+    const broker = "mi-cluster-esp-b1ffdfc9.a03.euc1.aws.hivemq.cloud"; // Cámbialo a tu broker HiveMQ
+    const options = {
+      clientId: "eve_esp32" + Math.random().toString(16).substr(2, 8),
+      username: "hivemq.client.1756778443039",  // tu usuario MQTT
+      password: "#Vi<8GRQdl*7L4zD0rm.", // tu contraseña MQTT
+    };
+
+    const client = mqtt.connect(broker, options);
+
+    const mqttStatus = document.getElementById("mqttStatus");
+    const espStatus = document.getElementById("espStatus");
+
+    // -------- EVENTOS DE CONEXIÓN --------
+    client.on("connect", () => {
+      mqttStatus.textContent = "Conectado";
+      mqttStatus.className = "connected";
+      console.log("MQTT conectado ✅");
+
+      // Suscribir a todos los tópicos
+      client.subscribe("sensor/plantas/1");
+      client.subscribe("sensor/plantas/2");
+      client.subscribe("sensor/plantas/3");
+      client.subscribe("sensor/plantas/4");
+
+      // Aquí marcamos ESP32 como conectado si llegan datos
+    });
+
+    client.on("error", (err) => {
+      mqttStatus.textContent = "Error";
+      mqttStatus.className = "disconnected";
+      console.error("Error MQTT:", err);
+    });
+
+    client.on("close", () => {
+      mqttStatus.textContent = "Desconectado";
+      mqttStatus.className = "disconnected";
+      espStatus.textContent = "Desconocido";
+      espStatus.className = "disconnected";
+    });
+
+    // -------- GESTIÓN DE MENSAJES --------
+    const charts = {};
+    const datasets = {};
+
+    function createChart(ctxId) {
+      const ctx = document.getElementById(ctxId).getContext("2d");
+      return new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [{
+            label: "Valor",
+            data: [],
+            borderColor: "green",
+            fill: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { title: { display: true, text: "Tiempo" }},
+            y: { title: { display: true, text: "VD" }}
+          }
+        }
+      });
+    }
+
+    charts["sensor/plantas/1"] = createChart("chart1");
+    charts["sensor/plantas/2"] = createChart("chart2");
+    charts["sensor/plantas/3"] = createChart("chart3");
+    charts["sensor/plantas/4"] = createChart("chart4");
+
+    client.on("message", (topic, message) => {
+      const value = message.toString();
+      const now = new Date().toLocaleTimeString();
+
+      // Marcar ESP conectado al recibir datos
+      espStatus.textContent = "Enviando datos";
+      espStatus.className = "connected";
+
+      // Seleccionar tabla y gráfico según el tópico
+      let tableId = "";
+      if (topic === "sensor/plantas/1") tableId = "table1";
+      if (topic === "sensor/plantas/2") tableId = "table2";
+      if (topic === "sensor/plantas/3") tableId = "table3";
+      if (topic === "sensor/plantas/4") tableId = "table4";
+
+      const table = document.getElementById(tableId);
+      const row = table.insertRow(-1);
+      row.insertCell(0).textContent = now;
+      row.insertCell(1).textContent = value;
+
+      // Actualizar gráfico
+      const chart = charts[topic];
+      if (chart) {
+        chart.data.labels.push(now);
+        chart.data.datasets[0].data.push(value);
+        if (chart.data.labels.length > 10) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+        chart.update();
+      }
+    });
+  </script>
+</body>
+</html>

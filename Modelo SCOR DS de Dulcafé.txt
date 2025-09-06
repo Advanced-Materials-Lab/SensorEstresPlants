@@ -1,0 +1,28 @@
+Modelo SCOR DS de Dulcafé
+Orquestar Acciones clave:
+Definir políticas de sostenibilidad en la cadena de suministro (certificación Fair Trade y prácticas eco-amigables).
+Integrar herramientas digitales (ERP) para gestionar datos en tiempo real.
+Fomentar la colaboración con productores locales de café.
+Planificar Realizar pronósticos basados en datos históricos de ventas y tendencias del mercado.
+Diseñar un plan maestro para la producción y la distribución.
+Crear buffers estratégicos de inventarios para mitigar riesgos en épocas de alta demanda (Navidad, Día de San Valentín).
+Ordenar Acciones clave:
+Digitalizar el proceso de pedidos para facilitar la recepción y confirmación de órdenes.
+Automatizar la gestión de órdenes a través de plataformas integradas con los minoristas.
+Supervisar indicadores como el fill rate y los tiempos de respuesta.
+Abastecer Acciones clave:
+Seleccionar proveedores confiables y diversificar para reducir riesgos.
+Implementar contratos a largo plazo con los agricultores locales.
+Monitorear la calidad de los granos de café mediante controles periódicos.
+Transformar Acciones clave:
+Establecer procesos de tostado y envasado eficientes y sostenibles.
+Controlar la calidad durante cada etapa de la transformación.
+Optimizar la capacidad instalada de las plantas de producción para evitar tiempos muertos.
+Cumplir Acciones clave:
+Diseñar una red logística eficiente que combine centros de distribución y entregas directas.
+Incorporar tecnología GPS para el seguimiento en tiempo real de los despachos.
+Implementar estrategias de última milla sostenibles (por ejemplo, transporte eléctrico).
+Devolver Acciones clave:
+Establecer políticas claras de devoluciones con los clientes.
+Crear un sistema para el reciclaje o reaprovechamiento de empaques y productos defectuosos.
+Analizar las causas de las devoluciones para evitar recurrencias.

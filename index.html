@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Detección y Control del Estrés en las Plantas</title>
+  <script src="https://cdn.jsdelivr.net/npm/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon/fonts/remixicon.css" rel="stylesheet">
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 20px; 
+      background: #f9fdf9;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+      background: #d6f5d6;   /* verde suave */
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    header h1 {
+      margin: 0;
+      font-size: 28px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      color: #2e7d32;
+    }
+    header h1 i {
+      color: #2e7d32;
+    }
+    header h2 {
+      margin: 5px 0 0 0;
+      font-size: 20px;
+      font-weight: normal;
+      color: #444;
+    }
+    main {
+      display: flex; 
+      gap: 20px; 
+    }
+    .panel { 
+      border: 1px solid #ccc; 
+      padding: 15px; 
+      border-radius: 10px; 
+      flex: 1; 
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    table { 
+      border-collapse: collapse; 
+      width: 100%; 
+      font-size: 14px; 
+    }
+    th, td { 
+      border: 1px solid #ccc; 
+      padding: 5px; 
+      text-align: center; 
+    }
+    #status span { font-weight: bold; }
+    button { 
+      padding: 10px; 
+      border: none; 
+      background: #4CAF50; 
+      color: white; 
+      border-radius: 5px; 
+      cursor: pointer; 
+    }
+    button:hover { background: #45a049; }
+  </style>
+</head>
+<body>
+<!-- Encabezado principal -->
+<header>
+  <h1><i class="ri-plant-fill"></i> Detección y Control del Estrés en las Plantas</h1>
+  <hr style="border: 0; border-top: 2px solid #2e7d32; width: 60%; margin: 8px auto;">
+  <h2>Sensores</h2>
+</header>
+
+<!-- Subencabezado independiente -->
+<section style="text-align:center; margin-bottom: 20px;">
+  <h3 style="color:#2e7d32; margin:0; font-size:24px; font-weight:bold; text-decoration: underline;">
+    Sensor 1
+  </h3>
+</section>
+
+  <!-- Contenido principal -->
+  <main>
+    <!-- Tabla de valores -->
+    <div class="panel">
+      <h3>Últimos 10 valores</h3>
+      <table id="tabla">
+        <thead>
+          <tr><th>Tiempo (s)</th><th>VD (V)</th><th>Rx (Ω)</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Gráfica -->
+    <div class="panel" style="flex:2">
+      <h3>Gráfica VD vs Tiempo 1</h3>
+      <canvas id="grafica"></canvas>
+    </div>
+
+    <!-- Estado -->
+    <div class="panel">
+      <h3>Estado del Sistema</h3>
+      <div id="status">
+        ESP32: <span id="esp-status">Desconectado ❌</span><br>
+        MQTT: <span id="mqtt-status">Desconectado ❌</span>
+      </div>
+      <br>
+      <button onclick="descargarExcel()">⬇ Descargar Excel</button>
+    </div>
+  </main>
+
+<script>
+  // Conectar al broker MQTT
+  const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+
+  const tabla = document.querySelector("#tabla tbody");
+  const espStatus = document.getElementById("esp-status");
+  const mqttStatus = document.getElementById("mqtt-status");
+
+  let datos = [];
+  let graficaDatos = { tiempo: [], VD: [] };
+
+  const ctx = document.getElementById('grafica').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: graficaDatos.tiempo,
+      datasets: [{
+        label: 'VD (V)',
+        data: graficaDatos.VD,
+        borderColor: 'blue',
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: "Tiempo (s)" } },
+        y: { title: { display: true, text: "VD (V)" } }
+      }
+    }
+  });
+
+  client.on("connect", () => {
+    console.log("Conectado a MQTT");
+    mqttStatus.textContent = "Conectado ✅";
+    client.subscribe("sensor/plantas");
+  });
+
+  client.on("message", (topic, message) => {
+    const data = JSON.parse(message.toString());
+    espStatus.textContent = "Conectado ✅";
+
+    datos.push([data.tiempo, data.VD, data.Rx]);
+    if (datos.length > 1000) datos.shift();
+
+    const ultimos = datos.slice(-10);
+    tabla.innerHTML = ultimos.map(r => 
+      `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("");
+
+    graficaDatos.tiempo.push(data.tiempo);
+    graficaDatos.VD.push(data.VD);
+    if (graficaDatos.tiempo.length > 50) {
+      graficaDatos.tiempo.shift();
+      graficaDatos.VD.shift();
+    }
+    chart.update();
+  });
+
+  client.on("error", () => mqttStatus.textContent = "Error ❌");
+  client.on("offline", () => mqttStatus.textContent = "Desconectado ❌");
+
+  // 🔄 Reconexión automática
+  client.on("close", () => {
+    mqttStatus.textContent = "Reconectando... 🔄";
+    setTimeout(() => client.reconnect(), 3000);
+  });
+
+  function descargarExcel() {
+    let ws = XLSX.utils.aoa_to_sheet([["Tiempo (s)", "VD (V)", "Rx (Ω)"], ...datos]);
+    let wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Datos ESP32");
+    XLSX.writeFile(wb, "datos_esp32.xlsx");
+  }
+</script>
+</body>
+</html>

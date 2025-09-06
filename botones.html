@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>🌱 Detección y Control del Estrés en las Plantas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 60px;
+      background: #f9f9f9;
+    }
+    h1 {
+      color: #2c7a2c;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #2c7a2c;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #256b25;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🌱 Detección y Control del Estrés en las Plantas</h1>
+
+  <button onclick="descargar(1)">⬇ Descargar Sensor 1</button>
+  <button onclick="descargar(2)">⬇ Descargar Sensor 2</button>
+  <button onclick="descargar(3)">⬇ Descargar Sensor 3</button>
+  <button onclick="descargar(4)">⬇ Descargar Sensor 4</button>
+
+  <script>
+    // Cambia la IP a la de tu ESP32
+    const ESP32_IP = "http://192.168.1.50";
+
+    function descargar(id) {
+      window.open(`${ESP32_IP}/sensor${id}.txt`, "_blank");
+    }
+  </script>
+
+</body>
+</html>

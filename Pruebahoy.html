@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>🌱 Dashboard MQTT</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+</head>
+<body>
+  <h2>🌱 Detección y Control del Estrés en las Plantas</h2>
+  <div id="mensajes"></div>
+
+  <script>
+    // Broker público (EMQX)
+    const broker = "wss://broker.emqx.io:8084/mqtt"; 
+    
+    const options = {
+      clean: true,
+      connectTimeout: 4000,
+      clientId: "EveWebClient-" + Math.random().toString(16).substr(2, 8),
+    };
+
+    const client = mqtt.connect(broker, options);
+
+    client.on("connect", () => {
+      console.log("✅ Conectado al broker público EMQX");
+      // Suscripción a varios tópicos
+      client.subscribe("sensor/temperatura");
+      client.subscribe("sensor/humedad");
+      client.subscribe("sensor/luz");
+      client.subscribe("sensor/ph");
+    });
+
+    client.on("message", (topic, message) => {
+      const mensajes = document.getElementById("mensajes");
+      const p = document.createElement("p");
+      p.textContent = `📡 ${topic}: ${message.toString()}`;
+      mensajes.appendChild(p);
+    });
+
+    client.on("error", (err) => {
+      console.error("❌ Error de conexión:", err);
+    });
+  </script>
+</body>
+</html>

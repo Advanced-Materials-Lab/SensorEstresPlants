@@ -1,0 +1,61 @@
+const int pinVB = 34;  // Entrada VB (amplificada)
+const int pinVD = 35;  // Entrada VD (amplificada)
+
+const float VCC = 1.4528;     // Voltaje de entrada al puente
+const float R1 = 10.0;     // Ohms
+const float R2 = 10.0;     // Ohms
+const float R3 = 100.0;    // Ohms
+
+const float ganancia = 2.0;
+const int samples = 10;
+
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12); // 12 bits para ESP32 (0-4095)
+  analogSetAttenuation(ADC_11db); // Permite leer hasta ~3.3V
+}
+
+float readVoltProm(int pin) {
+  long total = 0;
+  for (int i = 0; i < samples; i++) {
+    total += analogRead(pin);
+    delay(2);
+  }
+  float average = total / (float)samples;
+  return (average / 4095.0) * 3.3; // Convertir a voltaje (0 - 3.3V)
+}
+
+// Calcula Rx usando la ecuación del puente
+float calcularRx(float VDreal, float VCCreal, float R3) {
+  if (VDreal <= 0 || VDreal >= VCCreal) return -1; // Error
+  float relacion = VDreal / (VCCreal - VDreal);
+  return R3 * relacion;
+}
+
+void loop() {
+  float VBamp = readVoltProm(pinVB);
+  float VDamp = readVoltProm(pinVD);
+
+  float VB = VBamp / ganancia;
+  float VD = VDamp / ganancia;
+
+  Serial.print("VB = "); Serial.print(VB, 3); Serial.print(" V | ");
+  Serial.print("VD = "); Serial.print(VD, 3); Serial.print(" V | ");
+
+  float Rx = calcularRx(VD, VCC, R3);
+
+  // Detectar error de conexión o señal fuera de rango
+  bool errorConexion = (VDamp < 0.05 || VBamp < 0.05 || VDamp > 3.2 || VBamp > 3.2 || Rx < 0);
+
+  if (errorConexion) {
+    Serial.println("Mala conexión o señal inválida. Rx = -1");
+    Rx = -1.0;
+  } else {
+    Serial.print("Rx = "); Serial.print(Rx, 2); Serial.println(" ohms");
+  }
+
+  // Aquí podrías guardar Rx en SD o enviarlo por WiFi si lo deseas
+  // Ejemplo: guardarEnSD(Rx);
+
+  delay(1000);
+}

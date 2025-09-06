@@ -1,0 +1,73 @@
+import serial
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import random
+
+# Configuración del puerto serie (ajusta COM3 al tuyo)
+arduino = serial.Serial('COM3', 9600)
+
+# Número de sensores
+numSensores = 8
+
+# Colores diferentes para cada sensor
+colores = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta']
+
+# Datos
+tiempos = []
+humedades = [[] for _ in range(numSensores)]
+voltajes = [[] for _ in range(numSensores)]
+leds = [0] * numSensores  # Estado del LED (0 = OFF, 1 = ON)
+
+# Crear subplots
+fig, axs = plt.subplots(4, 2, figsize=(12, 10))
+axs = axs.flatten()  # Aplanar para acceder fácilmente
+
+def actualizar(frame):
+    global tiempos, humedades, voltajes, leds
+
+    linea = arduino.readline().decode('utf-8').strip()
+
+    try:
+        partes = linea.split("\t")
+        if len(partes) >= 1 + numSensores * 2:  
+            tiempo = float(partes[0])
+            tiempos.append(tiempo)
+
+            for i in range(numSensores):
+                h = float(partes[1 + i * 2])
+                v = float(partes[2 + i * 2])
+                humedades[i].append(h)
+                voltajes[i].append(v)
+
+                # LED ON si humedad < 10%
+                leds[i] = 1 if h < 10 else 0
+
+            # Mantener solo los últimos 50 puntos
+            if len(tiempos) > 50:
+                tiempos = tiempos[-50:]
+                for i in range(numSensores):
+                    humedades[i] = humedades[i][-50:]
+                    voltajes[i] = voltajes[i][-50:]
+
+            # Limpiar y graficar cada sensor
+            for i, ax in enumerate(axs):
+                ax.clear()
+                ax.plot(tiempos, humedades[i], marker='o', color=colores[i], label=f"HUM {i+1}")
+                ax.set_ylim(0, 300)  # Escala fija
+                ax.set_title(f"Sensor {i+1}")
+                ax.set_xlabel("Tiempo (s)")
+                ax.set_ylabel("Humedad (%)")
+
+                # Texto con valores y LED
+                ax.text(0.05, 0.85, f"H: {humedades[i][-1]:.1f}%", transform=ax.transAxes, color=colores[i])
+                ax.text(0.05, 0.75, f"V: {voltajes[i][-1]:.2f}V", transform=ax.transAxes, color="black")
+                ax.text(0.05, 0.65, f"LED: {'ON' if leds[i] else 'OFF'}", transform=ax.transAxes, color="red" if leds[i] else "green")
+
+                ax.legend(loc="upper right")
+
+    except Exception as e:
+        print("Error de parsing:", e)
+
+ani = FuncAnimation(fig, actualizar, interval=1000)
+plt.tight_layout()
+plt.show()
